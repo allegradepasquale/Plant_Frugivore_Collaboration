@@ -1,0 +1,52 @@
+data <- read.csv("ImageData.csv")
+
+###REMOVING NON-FRUGIVORES
+
+data_1 <- data[!(data$AnimalSpecies == "anteater" | data$AnimalSpecies == "feline sp." | data$AnimalSpecies == "hawk" | data$AnimalSpecies == "hummingbird" | data$AnimalSpecies == "nightjar" | data$AnimalSpecies == "ocelot" | data$AnimalSpecies == "vulture" | data$AnimalSpecies == "owl"),]
+
+###summing by number of conspecifics in each video --> this yields the same network result if I ungroup NumConspecifics and have 1 row per individual, because it all gets summed anyway
+
+visitations <- data_1 %>%
+  group_by(PlantSpecies, AnimalSpecies, webID) %>%
+  summarise(sum(NumConspecificsPresent))
+
+###filtering only records of fruit eaten
+intake <- data_1 %>%
+  filter(NumFruitEaten > 0)
+
+###Calculating intake per conspecific for the intake data frame
+intake_rate <- intake %>%
+  mutate(IntakePerConspecific = NumFruitEaten / NumConspecificsPresent)
+
+###Summing intake for the intake network
+intake_1 <- intake %>% group_by(PlantSpecies, AnimalSpecies, webID) %>% 
+  summarise(sum(NumFruitEaten))
+
+###Renaming columns for bipartite
+visitations_1 <- visitations %>% rename(lower = PlantSpecies,
+                          higher = AnimalSpecies,
+                          freq = `sum(NumConspecificsPresent)`)
+
+
+intake_1 <- intake_1 %>% rename(lower = PlantSpecies,
+                          higher = AnimalSpecies,
+                          freq = `sum(NumFruitEaten)`)
+
+intake_rate_1 <- intake_rate %>% rename(lower = PlantSpecies,
+                          higher = AnimalSpecies,
+                          freq = IntakePerConspecific)
+
+visitations_1$webID <- "Visitations"
+intake_1$webID <- "Intake"
+intake_rate_1$webID <- "IntakeRate"
+
+
+###CONVERTING TO BIPARTITE WEB
+bipartite::frame2webs(visitations_1)-> VisitationWeb
+bipartite::frame2webs(intake_1)-> IntakeWeb
+bipartite::frame2webs(intake_rate_1)-> IntakeRateWeb
+
+###BASIC VISUALIZATIONS
+plotweb(VisitationWeb$Visitations)
+plotweb(IntakeWeb$Intake)
+plotweb(IntakeRateWeb$IntakeRate)
